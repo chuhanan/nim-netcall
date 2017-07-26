@@ -1,0 +1,53 @@
+.con1,  .con2{
+  text-align: center;
+  display: inline-block;
+  width: 300px;
+  height: 200px;
+  border: 1px solid #ebebeb;
+  box-shadow: 1px 1px 4px #333;
+}
+
+.screen-container{
+  width: 500px;
+  height:300px;
+  border:1px solid #888;
+}
+
+.screen-container .action{
+  width: 2000px;
+  height:30px;
+  background: #eee;
+}
+
+.local-screen{
+  width: 150px;
+  height:100px;
+  border:1px solid #888;
+}
+
+.remote-screen{
+  width: 150px;
+  height:100px;
+  border:1px solid red;
+}
+
+.App-logo {
+  animation: App-logo-spin infinite 20s linear;
+  height: 80px;
+}
+
+.App-header {
+  background-color: #222;
+  height: 150px;
+  padding: 20px;
+  color: white;
+}
+
+.App-intro {
+  font-size: large;
+}
+
+@keyframes App-logo-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
