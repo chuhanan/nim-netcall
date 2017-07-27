@@ -27,7 +27,7 @@ class NetCallBridge{
     const NIM = window.NIM;
     NIM.use(WebRTC);
     this.nim = NIM.getInstance({
-      debug:debug || false,
+      debug:false,
       appKey: appKey,
       account: account,
       token: token,
@@ -47,7 +47,7 @@ class NetCallBridge{
       pushConfig,
       sessionConfig:this.sessionConfig
     }).then(obj => {
-      this.log('callVideo:对方接受了你的请求 ==obj', obj)
+      //this.log('callVideo:对方收到了你的请求', obj)
       // 设置超时计时器
       this.callTimer = setTimeout(() => {
         if (!this.netcall.callAccepted) {
@@ -74,6 +74,7 @@ class NetCallBridge{
       container:document.getElementById('localScreen'),
       remoteContainer:document.getElementById('remoteScreen')
     });
+    console.log('net call', netcall)
     //监听是否被叫
     netcall.on('beCalling', this.onBeCalling);
     //监听双方是否准备就绪
@@ -109,7 +110,7 @@ class NetCallBridge{
   //监听指令
   onControl = (obj) => {
     const netcall = this.netcall;
-    this.log("on control:", obj);
+    this.log("on control:");
     // 如果不是当前通话的指令, 直接丢掉
     if (netcall.notCurrentChannelId(obj)) {
         this.log("非当前通话的控制信息");
@@ -166,14 +167,13 @@ class NetCallBridge{
         // NETCALL_CONTROL_COMMAND_BUSY 占线
         case WebRTC.NETCALL_CONTROL_COMMAND_BUSY:
             this.log("对方正在通话中");
-            this.log("取消通话");
             this.netcall.hangup();
             this.clearCallTimer();
             //this.isBusy = true;
             //this.sendLocalMessage("对方正在通话中");
-            function doEnd() {
-                this.cancelCalling();
-            }
+            // function doEnd() {
+            //     this.cancelCalling();
+            // }
             //doEnd = doEnd.bind(this);
             // if (this.afterPlayRingA) {
             //     this.afterPlayRingA = function () {
@@ -234,19 +234,20 @@ class NetCallBridge{
     if(res.type === WebRTC.NETCALL_TYPE_VIDEO){
       promise = this.setDeviceVideo(true).then(() => {
         this.log('开启本地流')
-        netcall.startLocalStream();
+        return netcall.startLocalStream();
       });
       promise.then(() => {
         this.log('开启语音')
-        this.setDeviceAudioIn(true);
+        return this.setDeviceAudioIn(true);
+      }).then(() => {
+        return netcall.startRtc();
       }).then(() => {
         this.log('开启远程语音')
-        this.setDeviceAudioOutChat(true);
+        return this.setDeviceAudioOutChat(true);
       }).then(() => {
         this.log('开启远程视频')
         netcall.startRemoteStream();
-      }).then(() => {
-        netcall.startRtc();
+        netcall.setVideoShow('chuhan');
       })
     }else{
       this.log('语音通话')
@@ -260,7 +261,7 @@ class NetCallBridge{
   
   //监听被叫
   onBeCalling = (res) => {
-    console.log('有人呼叫你')
+    this.log('有人呼叫你')
     const netcall = this.netcall;
     //获取每次通话的唯一id
     const { channelId } = res;
@@ -280,8 +281,9 @@ class NetCallBridge{
         command:WebRTC.NETCALL_CONTROL_COMMAND_BUSY
       })
     }
-    //开始接听
+    // //开始接听
     netcall.initSignal().then(() => {
+      console.log("this.beCalledInfo", this.beCalledInfo)
       return netcall.response({
         accepted:true,
         beCalledInfo:this.beCalledInfo
@@ -297,7 +299,7 @@ class NetCallBridge{
   }
 
   //设置自己的摄像头
-  setDeviceVideo = (state) => {
+  setDeviceVideo(state){
     const netcall = this.netcall;
     if(state){
       return netcall.startDevice({
@@ -322,7 +324,7 @@ class NetCallBridge{
   }
 
   //设置自己的麦克风
-  setDeviceAudioIn = (state) => {
+  setDeviceAudioIn(state){
     if(state){
       return this.netcall.startDevice({
         type:WebRTC.DEVICE_TYPE_AUDIO_IN
@@ -345,7 +347,7 @@ class NetCallBridge{
   }
 
   //设置播放自己的声音 - 调试
-  setDeviceAudioOutLocal = (state) => {
+  setDeviceAudioOutLocal(state){
     const netcall = this.netcall;
     if(state){
       return netcall.startDevice({
@@ -359,7 +361,7 @@ class NetCallBridge{
   }
 
   //设置播放对方声音
-  setDeviceAudioOutChat = (state) => {
+  setDeviceAudioOutChat(state){
     if(state){
       return this.netcall.startDevice({
         type:WebRTC.DEVICE_TYPE_AUDIO_OUT_CHAT
@@ -372,7 +374,7 @@ class NetCallBridge{
   }
 
   //清理函数
-  resetWhenHangup = () => {
+  resetWhenHangup(){
     const nc = this.netcall;
     this.beCalledInfo = null;
     this.beCalling = false;

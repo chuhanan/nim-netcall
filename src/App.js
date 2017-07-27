@@ -9,14 +9,14 @@ const nc = new NetCallBridge();
 const localConfig = {
   debug:true,
   appKey:"6b53bb0b26217518877a91b63ec6fbf0",
-  token:"chuhan",
-  account:"chuhan",
+  token:"testvideo",
+  account:"testvideo",
   container:document.getElementById('localScreen'),
   remoteContainer:document.getElementById('remoteScreen')
 }
 //远程配置
 const remoteConfig = {
-  account:'testvideo',
+  account:'chuhan',
 }
 
 class App extends Component {
