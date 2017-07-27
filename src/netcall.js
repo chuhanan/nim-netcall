@@ -1,4 +1,5 @@
 const WebRTC = window.WebRTC;
+const Netcall = window.Netcall;
 class NetCallBridge{
   //netcall 实例
   netcall = null;
@@ -25,6 +26,7 @@ class NetCallBridge{
 
   initNetcall = ({debug, appKey, account, token}) => {
     const NIM = window.NIM;
+    
     NIM.use(WebRTC);
     this.nim = NIM.getInstance({
       debug:false,
@@ -44,7 +46,15 @@ class NetCallBridge{
     this.netcall.call({
       type,
       account:'testvideo',
-      pushConfig,
+      pushConfig:{
+        enable:true,
+        needBadge:true,
+        needPushNick:true,
+        pushContent:"",
+        custom:"",
+        pushPayload:"",
+        sound:""
+      },
       sessionConfig:this.sessionConfig
     }).then(obj => {
       //this.log('callVideo:对方收到了你的请求', obj)
@@ -83,6 +93,12 @@ class NetCallBridge{
     netcall.on("callRejected", this.onCallingRejected);
     //监听指令
     netcall.on("control", this.onControl);
+    //监听第三方加入
+    netcall.on('joinChannel', () => {
+      netcall.startRemoteStream();
+      netcall.setSessionVideoQuality(WebRTC.CHAT_VIDEO_QUALITY_NORMAL);
+      netcall.setSessionVideoFrameRate(WebRTC.CHAT_VIDEO_FRAME_RATE_NORMAL)
+    })
     //信号关闭了
     netcall.on('signalClosed', this.signalClosed);
     //监听一方挂断,另一方会收到通知
@@ -123,28 +139,28 @@ class NetCallBridge{
     var type = obj.type;
     switch (type) {
         // NETCALL_CONTROL_COMMAND_NOTIFY_AUDIO_ON 通知对方自己打开了音频
-        case WebRTC.NETCALL_CONTROL_COMMAND_NOTIFY_AUDIO_ON:
+        case Netcall.NETCALL_CONTROL_COMMAND_NOTIFY_AUDIO_ON:
             this.log("对方打开了麦克风");
             break;
         // NETCALL_CONTROL_COMMAND_NOTIFY_AUDIO_OFF 通知对方自己关闭了音频
-        case WebRTC.NETCALL_CONTROL_COMMAND_NOTIFY_AUDIO_OFF:
+        case Netcall.NETCALL_CONTROL_COMMAND_NOTIFY_AUDIO_OFF:
             this.log("对方关闭了麦克风");
             break;
         // NETCALL_CONTROL_COMMAND_NOTIFY_VIDEO_ON 通知对方自己打开了视频
-        case WebRTC.NETCALL_CONTROL_COMMAND_NOTIFY_VIDEO_ON:
+        case Netcall.NETCALL_CONTROL_COMMAND_NOTIFY_VIDEO_ON:
             this.log("对方打开了摄像头");
             break;
         // NETCALL_CONTROL_COMMAND_NOTIFY_VIDEO_OFF 通知对方自己关闭了视频
-        case WebRTC.NETCALL_CONTROL_COMMAND_NOTIFY_VIDEO_OFF:
+        case Netcall.NETCALL_CONTROL_COMMAND_NOTIFY_VIDEO_OFF:
             this.log("对方关闭了摄像头");
             break;
         // NETCALL_CONTROL_COMMAND_SWITCH_AUDIO_TO_VIDEO_REJECT 拒绝从音频切换到视频
-        case WebRTC.NETCALL_CONTROL_COMMAND_SWITCH_AUDIO_TO_VIDEO_REJECT:
+        case Netcall.NETCALL_CONTROL_COMMAND_SWITCH_AUDIO_TO_VIDEO_REJECT:
             this.log("对方拒绝从音频切换到视频通话");
             //this.requestSwitchToVideoRejected();
             break;
         // NETCALL_CONTROL_COMMAND_SWITCH_AUDIO_TO_VIDEO 请求从音频切换到视频
-        case WebRTC.NETCALL_CONTROL_COMMAND_SWITCH_AUDIO_TO_VIDEO:
+        case Netcall.NETCALL_CONTROL_COMMAND_SWITCH_AUDIO_TO_VIDEO:
             this.log("对方请求从音频切换到视频通话");
             // if (this.requestSwitchToVideoWaiting) {
             //     this.doSwitchToVideo();
@@ -153,19 +169,19 @@ class NetCallBridge{
             // }
             break;
         // NETCALL_CONTROL_COMMAND_SWITCH_AUDIO_TO_VIDEO_AGREE 同意从音频切换到视频
-        case WebRTC.NETCALL_CONTROL_COMMAND_SWITCH_AUDIO_TO_VIDEO_AGREE:
+        case Netcall.NETCALL_CONTROL_COMMAND_SWITCH_AUDIO_TO_VIDEO_AGREE:
             this.log("对方同意从音频切换到视频通话");
             // if (this.requestSwitchToVideoWaiting) {
             //     this.doSwitchToVideo();
             // }
             break;
         // NETCALL_CONTROL_COMMAND_SWITCH_VIDEO_TO_AUDIO 从视频切换到音频
-        case WebRTC.NETCALL_CONTROL_COMMAND_SWITCH_VIDEO_TO_AUDIO:
+        case Netcall.NETCALL_CONTROL_COMMAND_SWITCH_VIDEO_TO_AUDIO:
             this.log("对方请求从视频切换为音频");
             //this.doSwitchToAudio();
             break;
         // NETCALL_CONTROL_COMMAND_BUSY 占线
-        case WebRTC.NETCALL_CONTROL_COMMAND_BUSY:
+        case Netcall.NETCALL_CONTROL_COMMAND_BUSY:
             this.log("对方正在通话中");
             this.netcall.hangup();
             this.clearCallTimer();
@@ -189,7 +205,7 @@ class NetCallBridge{
             // }
             break;
         // NETCALL_CONTROL_COMMAND_SELF_CAMERA_INVALID 自己的摄像头不可用
-        case WebRTC.NETCALL_CONTROL_COMMAND_SELF_CAMERA_INVALID:
+        case Netcall.NETCALL_CONTROL_COMMAND_SELF_CAMERA_INVALID:
             this.log("对方摄像头不可用");
             break;
         // NETCALL_CONTROL_COMMAND_SELF_ON_BACKGROUND 自己处于后台
@@ -232,30 +248,29 @@ class NetCallBridge{
     let promise;
     //判断发起的是音视频通话
     if(res.type === WebRTC.NETCALL_TYPE_VIDEO){
-      promise = this.setDeviceVideo(true).then(() => {
-        this.log('开启本地流')
-        return netcall.startLocalStream();
-      });
-      promise.then(() => {
-        this.log('开启语音')
-        return this.setDeviceAudioIn(true);
-      }).then(() => {
-        return netcall.startRtc();
-      }).then(() => {
-        this.log('开启远程语音')
-        return this.setDeviceAudioOutChat(true);
-      }).then(() => {
-        this.log('开启远程视频')
-        netcall.startRemoteStream();
-        netcall.setVideoShow('chuhan');
-      })
+      promise = this.setDeviceVideoIn(true);
     }else{
-      this.log('语音通话')
-      this.setDeviceAudioIn(true);
-      this.setDeviceAudioOutChat(true);
-      this.setDeviceAudioOutLocal(false);
-      // this.setDeviceVideo(false);
+      promise = this.setDeviceVideoIn(false);
     }
+    promise.then(() => {
+      this.log('开启语音')
+      return this.setDeviceAudioIn(true)
+    }).then(() => {
+      this.log('开启本地流')
+      netcall.startLocalStream();
+      netcall.setCaptureVolume(255);
+    }).then(() => {
+      this.log('开始webrtc连接')
+      return netcall.startRtc().then(() => {
+        this.log('开启远程语音')
+        this.setDeviceAudioOutChat(true);
+        // netcall.startRemoteStream();
+      });
+    }).then(() => {
+      
+    }).catch((e) => {
+      console.log(e)
+    })
   }
 
   
@@ -268,7 +283,7 @@ class NetCallBridge{
     //通知对方自己已经收到通知
     netcall.control({
       channelId,
-      command:WebRTC.NETCALL_CONTROL_COMMAND_START_NOTIFY_RECEIVED
+      command:Netcall.NETCALL_CONTROL_COMMAND_START_NOTIFY_RECEIVED
     })
     //只有在没有通话并且没有被叫的时候才记录被叫信息,否则直接挂断
     if(!netcall.calling && !this.beCalling){
@@ -298,24 +313,28 @@ class NetCallBridge{
     })
   }
 
+  //
+
   //设置自己的摄像头
-  setDeviceVideo(state){
+  setDeviceVideoIn(state){
     const netcall = this.netcall;
     if(state){
       return netcall.startDevice({
-        type:WebRTC.DEVICE_TYPE_VIDEO
+        type:Netcall.DEVICE_TYPE_VIDEO
       }).then(() => {
+        this.log('通知对方自己开了摄像头')
         netcall.control({
-          command:WebRTC.NETCALL_CONTROL_COMMAND_NOTIFY_VIDEO_ON
+          command:Netcall.NETCALL_CONTROL_COMMAND_NOTIFY_VIDEO_ON
         })
       }).catch(() => {
-        this.log('启动摄像头失败')
+        this.log('启动摄像头失败, 通知对方启动自己启动失败, 摄像头不可用')
         netcall.control({
-          command:WebRTC.NETCALL_CONTROL_SELF_CAMERA_INVALID
+          command:Netcall.NETCALL_CONTROL_SELF_CAMERA_INVALID
         })
       })
     }else{
-      return netcall.stopDevice(WebRTC.DEVICE_TYPE_VIDEO).then(() => {
+      return netcall.stopDevice(Netcall.DEVICE_TYPE_VIDEO).then(() => {
+        this.log('关闭摄像头成功, 并且通知了对方')
         netcall.control({
           command:WebRTC.NETCALL_CONTROL_COMMAND_NOTIFY_VIDEO_OFF
         })
@@ -324,23 +343,25 @@ class NetCallBridge{
   }
 
   //设置自己的麦克风
-  setDeviceAudioIn(state){
+  setDeviceAudioIn = (state) => {
     if(state){
       return this.netcall.startDevice({
-        type:WebRTC.DEVICE_TYPE_AUDIO_IN
+        type:Netcall.DEVICE_TYPE_AUDIO_IN
       }).then(() => {
         //通知对方自己开启了麦克风
+        this.log('通知对方自己开启了麦克风');
         this.netcall.control({
-          command:WebRTC.NETCALL_CONTROL_COMMAND_NOTIFY_AUDIO_ON
+          command:Netcall.NETCALL_CONTROL_COMMAND_NOTIFY_AUDIO_ON
         })
       }).catch(() => {
         this.log("启用麦克风失败!");
       })
     }else{
-      return this.netcall.stopDevice(WebRTC.DEVICE_TYPE_AUDIO_IN).then(() => {
+      return this.netcall.stopDevice(Netcall.DEVICE_TYPE_AUDIO_IN).then(() => {
         //通知对方自己关闭了麦克风
+        this.log('通知对方自己关闭了麦克风');
         this.netcall.control({
-          command:WebRTC.NETCALL_CONTROL_COMMAND_NOTIFY_AUDIO_OFF
+          command:Netcall.NETCALL_CONTROL_COMMAND_NOTIFY_AUDIO_OFF
         })
       })
     }
@@ -360,21 +381,29 @@ class NetCallBridge{
     }
   }
 
-  //设置播放对方声音
-  setDeviceAudioOutChat(state){
+  //设置扬声器
+  setDeviceAudioOutChat = (state) => {
     if(state){
       return this.netcall.startDevice({
-        type:WebRTC.DEVICE_TYPE_AUDIO_OUT_CHAT
+        type:Netcall.DEVICE_TYPE_AUDIO_OUT_CHAT
+      }).then(() => {
+        this.log('开启扬声器成功');
       }).catch(() => {
-        this.log("播放对方的声音失败")
+        this.log("开启扬声器失败")
       })
     }else{
-      return this.netcall.stopDevice(WebRTC.DEVICE_TYPE_AUDIO_OUT_CHAT);
+      this.log('关闭扬声器')
+      return this.netcall.stopDevice(Netcall.DEVICE_TYPE_AUDIO_OUT_CHAT)
+        .then(() => {
+          this.log('关闭扬声器成功')
+        }).catch(() => {
+          this.log('关闭扬声器失败')
+        });
     }
   }
 
   //清理函数
-  resetWhenHangup(){
+  resetWhenHangup = () => {
     const nc = this.netcall;
     this.beCalledInfo = null;
     this.beCalling = false;
